@@ -4,6 +4,14 @@ variable "key_name" {
   type        = string
   default     = "eyjo-ec2-rsa-pem"  # 실제 키 페어 이름으로 대체하세요
 }
+
+variable "key_name_ed25519" {
+  description = "Name of an existing EC2 KeyPair to enable SSH access to the instances."
+  type        = string
+  default     = "eyjo-ec2-ed25519-pem"  # 실제 키 페어 이름으로 대체하세요
+}
+
+
 variable "latest_ami_al2_ssm_parameter" {
   description = "(DO NOT CHANGE)"
   type        = string
@@ -18,9 +26,3 @@ aws ec2 describe-images \
   --query 'Images[*].[ImageId,Name,CreationDate]' \
   --output table
 */
-
-variable "ubuntu_version" {
-  description = "Ubuntu version to use"
-  type        = string
-  default     = "22.04" # 또는 원하는 버전
-}
