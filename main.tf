@@ -296,15 +296,6 @@ until ping -c 1 8.8.8.8 &> /dev/null; do sleep 3; done
 hostnamectl --static set-hostname DNSSRV
 echo "127.0.0.1 localhost DNSSRV" > /etc/hosts
 
-# DNS 설정
-echo "[Resolve]
-DNS=8.8.8.8 8.8.4.4
-FallbackDNS=1.1.1.1
-Domains=~.
-Cache=yes
-DNSStubListener=yes" > /etc/systemd/resolved.conf
-systemctl restart systemd-resolved
-
 # 패키지 설치
 apt-get update -y
 apt-get install -y bind9 bind9-doc language-pack-ko
@@ -312,7 +303,7 @@ apt-get install -y bind9 bind9-doc language-pack-ko
 # 설정 파일 백업
 [ -f /etc/bind/named.conf.options ] && mv /etc/bind/named.conf.options /etc/bind/named.conf.options.bak
 
-# 설정 파일 생성 - 단일 명령으로
+# 설정 파일 생성
 echo 'options {
    directory "/var/cache/bind";
    recursion yes;
@@ -334,9 +325,9 @@ zone "ap-northeast-2.compute.internal" {
     forwarders { 10.70.1.250; 10.70.2.250; };
 };' > /etc/bind/named.conf.options
 
-echo 'zone "idcneta.internal" {
+echo 'zone "idc.internal" {
     type master;
-    file "/etc/bind/db.idcneta.internal";
+    file "/etc/bind/db.idc.internal";
 };
 zone "80.10.in-addr.arpa" {
     type master;
@@ -344,7 +335,7 @@ zone "80.10.in-addr.arpa" {
 };' > /etc/bind/named.conf.local
 
 echo '$TTL 30
-@ IN SOA idcneta.internal. root.idcneta.internal. (
+@ IN SOA idc.internal. root.idc.internal. (
   2019122114 ; serial
   3600       ; refresh
   900        ; retry
@@ -352,15 +343,15 @@ echo '$TTL 30
   86400      ; minimum ttl
 )
 ; dns server
-@      IN NS ns1.idcneta.internal.
+@      IN NS ns1.idc.internal.
 ; ip address of dns server
 ns1    IN A  10.80.1.200
 ; Hosts
 websrv   IN A  10.80.1.100
-dnssrv   IN A  10.80.1.200' > /etc/bind/db.idcneta.internal
+dnssrv   IN A  10.80.1.200' > /etc/bind/db.idc.internal
 
 echo '$TTL 30
-@ IN SOA idcneta.internal. root.idcneta.internal. (
+@ IN SOA idc.internal. root.idc.internal. (
   2019122114 ; serial
   3600       ; refresh
   900        ; retry
@@ -368,12 +359,12 @@ echo '$TTL 30
   86400      ; minimum ttl
 )
 ; dns server
-@      IN NS ns1.idcneta.internal.
+@      IN NS ns1.idc.internal.
 ; ip address of dns server
-3      IN PTR  ns1.idcneta.internal.
+3      IN PTR  ns1.idc.internal.
 ; A Record list
-100.1    IN PTR  websrv.idcneta.internal.
-200.1    IN PTR  dnssrv.idcneta.internal.' > /etc/bind/db.10.80
+100.1    IN PTR  websrv.idc.internal.
+200.1    IN PTR  dnssrv.idc.internal.' > /etc/bind/db.10.80
 
 # 권한 설정 및 서비스 시작
 chown -R bind:bind /etc/bind
@@ -381,6 +372,12 @@ chmod -R 644 /etc/bind
 find /etc/bind -type d -exec chmod 755 {} \;
 systemctl restart bind9
 systemctl enable bind9
+
+
+# resolv.conf 심볼릭 링크 변경
+rm -f /etc/resolv.conf
+ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
 EOF
 )
   tags = {

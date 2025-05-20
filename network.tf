@@ -1,3 +1,5 @@
+
+####################################################################
 # VPC1 생성
 resource "aws_vpc" "vpc1" {
   cidr_block           = "10.70.0.0/16"
@@ -57,6 +59,12 @@ resource "aws_route_table_association" "rta_subnet2" {
   subnet_id      = aws_subnet.subnet2.id
   route_table_id = aws_route_table.rt1.id
 }
+
+
+
+
+####################################################################
+
 # VPC2 생성
 resource "aws_vpc" "vpc2" {
   cidr_block           = "10.80.0.0/16"
@@ -121,4 +129,24 @@ resource "aws_route" "peering_route2" {
   route_table_id             = aws_route_table.rt3.id
   destination_cidr_block     = aws_vpc.vpc1.cidr_block
   vpc_peering_connection_id  = aws_vpc_peering_connection.vpc_peering.id
+}
+
+
+# VPC DHCP 옵션 세트 생성
+resource "aws_vpc_dhcp_options" "custom_dhcp_options" {
+  domain_name          = "idc.internal"  # 내부 도메인 이름
+  domain_name_servers  = ["10.80.1.200", "8.8.8.8"]  # 기본 DNS 서버 (DNSSRV IP와 Google DNS)
+  ntp_servers          = ["203.248.240.140", "168.126.63.1"]  # AWS NTP 서버
+  # netbios_name_servers = []
+  # netbios_node_type    = 8
+
+  tags = {
+    Name = "IDC-DHCP-Options"
+  }
+}
+
+# DHCP 옵션 세트를 VPC에 연결
+resource "aws_vpc_dhcp_options_association" "dhcp_options_association" {
+  vpc_id          = aws_vpc.vpc2.id  # 사용중인 VPC ID (적절히 변경 필요)
+  dhcp_options_id = aws_vpc_dhcp_options.custom_dhcp_options.id
 }
