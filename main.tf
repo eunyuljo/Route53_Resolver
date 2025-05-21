@@ -126,6 +126,51 @@ resource "aws_security_group" "sg2" {
     Name = "VPC1-Route53-Resolver-SG"
   }
 }
+# SG2-1: VPC1-DNS-Proxy
+resource "aws_security_group" "sg2-1" {
+  name        = "VPC1-DNS-Proxy-SG"
+  description = "VPC1-DNS-Proxy-SG"
+  vpc_id      = aws_vpc.vpc1.id
+  ingress {
+    description = "TCP DNS"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/8"]
+  }
+  ingress {
+    description = "UDP DNS"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["10.0.0.0/8"]
+  }
+  ingress {
+    description = "ICMP"
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+  }
+  tags = {
+    Name = "VPC1-Route53-Resolver-SG"
+  }
+}
+
 # SG3: VPC2-IDC-DNSSRV-SG
 resource "aws_security_group" "sg3" {
   name        = "VPC2-IDC-DNSSRV-SG"
@@ -207,6 +252,9 @@ resource "aws_security_group" "sg4" {
     Name = "VPC2-IDC-WEBSRV-SG"
   }
 }
+
+
+
 # ENI 생성 (Instance3의 eth0)
 resource "aws_network_interface" "instance3_eni_eth0" {
   subnet_id       = aws_subnet.subnet3.id
@@ -255,6 +303,66 @@ resource "aws_instance" "instance1" {
     Name = "AWS-WEBSRV1"
   }
 }
+
+#Instance: AWS-DNS-Proxy
+resource "aws_instance" "dns_proxy" {
+  ami                         = data.aws_ssm_parameter.latest_ami.value
+  instance_type               = "t3.small"
+  key_name                    = var.key_name
+  subnet_id                   = aws_subnet.subnet1.id
+  private_ip                  = "10.70.1.101"
+  vpc_security_group_ids      = [aws_security_group.sg2-1.id]
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ssm_instance_profile.name
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    # 호스트명 설정
+    hostnamectl --static set-hostname DNSPROXY
+    sed -i "s/localhost4.localdomain4/localhost4.localdomain4 DNSPROXY/g" /etc/hosts
+    
+    # 필요한 패키지 설치
+    yum -y update
+    yum -y install dnsmasq bind-utils tcpdump
+    
+    # DNS 프록시 설정
+    cat > /etc/dnsmasq.conf << 'DNSCONF'
+    # 기본 설정
+    listen-address=127.0.0.1,10.70.1.101
+    bind-interfaces
+    domain-needed
+    bogus-priv
+    
+    # 캐시 설정
+    cache-size=1000
+    neg-ttl=60
+    
+    # 로그 설정
+    log-queries
+    log-facility=/var/log/dnsmasq.log
+    
+    # 네트워크별 DNS 서버 설정 (필요에 따라 수정)
+    # IDC-DNS
+   
+    # 모든 쿼리 전달 방식
+    server=/idc.internal/10.80.1.200
+    #server=10.80.1.200
+    
+    # 기본 업스트림 DNS 서버
+    server=8.8.8.8
+    server=8.8.4.4
+    DNSCONF
+    
+    # DNS 프록시 서비스 시작 및 활성화
+    systemctl enable dnsmasq
+    systemctl start dnsmasq
+  EOF
+  )
+  tags = {
+    Name = "AWS-DNS-Proxy"
+  }
+}
+
+
 # Instance2: AWS-WEBSRV2
 resource "aws_instance" "instance2" {
   ami                         = data.aws_ssm_parameter.latest_ami.value
@@ -317,12 +425,12 @@ echo 'options {
 zone "eyjo.internal" {
     type forward;
     forward only;
-    forwarders { 10.70.1.250; 10.70.2.250; };
+    forwarders { 10.70.1.250; 10.70.2.250; 10.70.1.101;};
 };
 zone "ap-northeast-2.compute.internal" {
     type forward;
     forward only;
-    forwarders { 10.70.1.250; 10.70.2.250; };
+    forwarders { 10.70.1.250; 10.70.2.250; 10.70.1.101;};
 };' > /etc/bind/named.conf.options
 
 echo 'zone "idc.internal" {
