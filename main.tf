@@ -516,3 +516,59 @@ resource "aws_instance" "instance4" {
     Name = "IDC-WEBSRV"
   }
 }
+
+# ######################## DNS - Proxy 구현 간 쿼리 테스트 인프라 ##########################
+
+
+# # SG4: VPC2-IDC-WEBSRV-SG
+# resource "aws_security_group" "sg0" {
+#   name        = "VPC0-SRV-SG"
+#   description = "VPC0-SRV-SG"
+#   vpc_id      = aws_vpc.vpc0.id
+#   ingress {
+#     description = "SSH"
+#     from_port   = 22
+#     to_port     = 22
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   ingress {
+#     description = "HTTP"
+#     from_port   = 80
+#     to_port     = 80
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   ingress {
+#     description = "ICMP"
+#     from_port   = -1
+#     to_port     = -1
+#     protocol    = "icmp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#     description = "Allow all outbound traffic"
+#   }
+#   tags = {
+#     Name = "VPC0-SRV-SG"
+#   }
+# }
+
+# # Instance4: IDC-WEBSRV
+# resource "aws_instance" "instance5" {
+#   ami                         = data.aws_ssm_parameter.latest_ami.value
+#   instance_type               = "t3.small"
+#   key_name                    = var.key_name
+#   subnet_id                   = aws_subnet.subnet0.id
+#   private_ip                  = "10.60.1.100"
+#   vpc_security_group_ids      = [aws_security_group.sg0.id]
+#   associate_public_ip_address = true
+#   iam_instance_profile        = aws_iam_instance_profile.ssm_instance_profile.name
+#   tags = {
+#     Name = "SRV"
+#   }
+# }
